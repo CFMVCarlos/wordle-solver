@@ -1,0 +1,3 @@
+## 2024-06-17 - Seamless mixed-input flows
+**Learning:** In applications that require frequent switching between keyboard and mouse (like typing a word, then clicking a button), forcing the user to switch input methods breaks flow and degrades UX. Furthermore, clickable buttons that silently do nothing (placeholders) confuse users.
+**Action:** Always provide keyboard shortcuts (like `Enter` to submit) for primary actions in typing-heavy flows, and explicitly label and disable unimplemented UI elements.

@@ -44,6 +44,12 @@ def keyboardPress(key):
         if key == keyboard.Key.esc:
             root.quit()
 
+        # Handle Enter to submit the word
+        if key == keyboard.Key.enter:
+            if charPosition == WORD_LENGTH and not finishFlag:
+                root.after(0, submit)
+            return
+
         # Handle Backspace to delete the last letter
         if key == keyboard.Key.backspace:
             if charPosition == 0:
@@ -181,19 +187,19 @@ def createStructureAttempt(numberOfAttempt: int):
     for index in range(WORD_LENGTH):
         button = tk.Button(
             frame, text="  ", bd=3, bg=BACKGROUND_COLOR_GRAY, activebackground=BACKGROUND_COLOR_SOFT_YELLOW,
-            padx=20, state=tk.DISABLED, command=lambda buttonNumber=index: letterButtonPressed(buttonNumber)
+            padx=20, state=tk.DISABLED, cursor="hand2", command=lambda buttonNumber=index: letterButtonPressed(buttonNumber)
         )
         button.grid(row=numberOfAttempt, column=index + 1, padx=5, pady=5)
         buttons.append(button)
 
     # Submit and Undo buttons
-    buttonSubmit = tk.Button(frame, text="Submit", bd=6,
-                             command=submit, activebackground="#bbbbbb")
+    buttonSubmit = tk.Button(frame, text="Submit (Enter)", bd=6,
+                             command=submit, activebackground="#bbbbbb", cursor="hand2")
     buttonSubmit.grid(row=numberOfAttempt,
                       column=WORD_LENGTH + 1, padx=5, pady=5)
 
     buttonUndo = tk.Button(frame, text="Undo", command=undo,
-                           bg="#aaaacc", activebackground="#bbccbb")
+                           bg="#aaaacc", activebackground="#bbccbb", state=tk.DISABLED)
     buttonUndo.grid(row=numberOfAttempt,
                     column=NUMBER_ELEMENTS - 1, padx=5, pady=5)
 

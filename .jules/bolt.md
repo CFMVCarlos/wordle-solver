@@ -1,0 +1,3 @@
+## 2024-06-17 - O(N^2) list.pop() bottleneck in Python backend
+**Learning:** The Python backend heavily relied on mutating a global `dictionary` list using `list.pop(i)` inside `while` loops for filtering words. Since removing an item from the middle of a list is O(N) and it occurs within an O(N) loop, this resulted in an O(N^2) bottleneck for word elimination (`removeGray`, `removeYellow`, `removeGreen`). Furthermore, simple reassignment (`global dictionary; dictionary = [...]`) breaks external references to the list.
+**Action:** Always use list comprehensions with slice assignment (`list[:] = [...]`) to filter global lists in Python in O(N) time while preserving references across modules.

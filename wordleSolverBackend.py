@@ -43,37 +43,22 @@ def White(
 
 
 def removeGray(char: str, index: int, softRemove: bool = False):
-    i = 0
-    while i < len(dictionary):
-        word = dictionary[i]
-        if (softRemove and word[index] != char) or (char in word):
-            dictionary.pop(i)
-        else:
-            i += 1
+    # Optimize O(N^2) list.pop() to O(N) slice assignment with list comprehension
+    dictionary[:] = [word for word in dictionary if not ((softRemove and word[index] != char) or (char in word))]
 
 # Filters out words based on "yellow" rule: removes words missing the character at any index
 
 
 def removeYellow(char: str, index: int):
-    i = 0
-    while i < len(dictionary):
-        word = dictionary[i]
-        if char in word and word[index] != char:
-            i += 1
-        else:
-            dictionary.pop(i)
+    # Optimize O(N^2) list.pop() to O(N) slice assignment with list comprehension
+    dictionary[:] = [word for word in dictionary if char in word and word[index] != char]
 
 # Filters out words based on "green" rule: removes words that don't have the character at the exact index
 
 
 def removeGreen(char: str, index: int):
-    i = 0
-    while i < len(dictionary):
-        word = dictionary[i]
-        if char in word and word[index] == char:
-            i += 1
-        else:
-            dictionary.pop(i)
+    # Optimize O(N^2) list.pop() to O(N) slice assignment with list comprehension
+    dictionary[:] = [word for word in dictionary if char in word and word[index] == char]
 
 # Checks for duplicate characters in a word
 

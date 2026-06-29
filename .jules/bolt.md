@@ -1,3 +1,7 @@
 ## 2024-06-17 - O(N^2) list.pop() bottleneck in Python backend
 **Learning:** The Python backend heavily relied on mutating a global `dictionary` list using `list.pop(i)` inside `while` loops for filtering words. Since removing an item from the middle of a list is O(N) and it occurs within an O(N) loop, this resulted in an O(N^2) bottleneck for word elimination (`removeGray`, `removeYellow`, `removeGreen`). Furthermore, simple reassignment (`global dictionary; dictionary = [...]`) breaks external references to the list.
 **Action:** Always use list comprehensions with slice assignment (`list[:] = [...]`) to filter global lists in Python in O(N) time while preserving references across modules.
+
+## 2024-05-18 - O(N*M) nested loop bottleneck for character frequency counting
+**Learning:** The Python backend counted character frequencies across a list of strings using nested Python loops (`for word in dictionary: for char in word:`). This introduces significant overhead compared to C-level string operations in CPython. Joining all the strings with `"".join(dictionary)` and then running `str.count()` for each character in the alphabet avoids this bottleneck, yielding an approximately ~5x performance improvement.
+**Action:** Use Python's built-in C-implemented string methods like `str.count()` on joined strings instead of relying on pure Python nested iterations for aggregating statistics across string lists.

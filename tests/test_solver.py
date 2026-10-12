@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from wordleSolverBackend import (
+from wordle_solver.wordleSolverBackend import (
     ERROR,
     SUCCESS,
     WordleSolver,
@@ -19,12 +19,10 @@ from wordleSolverBackend import (
 
 @pytest.fixture
 def solver() -> WordleSolver:
-    """Fixture providing an initialized WordleSolver instance."""
     return WordleSolver("CSW19.txt")
 
 
 def test_dictionary_loading(solver: WordleSolver) -> None:
-    """Verify that the dictionary loads 5-letter alphabetic words properly."""
     assert solver.words_left > 10000
     assert solver.is_valid_word("crane")
     assert solver.is_valid_word("soare")
@@ -33,7 +31,6 @@ def test_dictionary_loading(solver: WordleSolver) -> None:
 
 
 def test_matches_feedback_basic(solver: WordleSolver) -> None:
-    """Test standard single-occurrence feedback filtering."""
     # Target: crane, Guess: slate
     # s: B, l: B, a: G, t: B, e: G
     feedback = ["B", "B", "G", "B", "G"]
@@ -43,7 +40,6 @@ def test_matches_feedback_basic(solver: WordleSolver) -> None:
 
 
 def test_matches_feedback_duplicates(solver: WordleSolver) -> None:
-    """Test exact duplicate-letter constraint handling."""
     # Target: robot, Guess: boost
     # b: Y, o: G, o: Y, s: B, t: G
     assert solver.matches_feedback("robot", "boost", ["Y", "G", "Y", "B", "G"]) is True
@@ -59,7 +55,6 @@ def test_matches_feedback_duplicates(solver: WordleSolver) -> None:
 
 
 def test_filtering_and_undo(solver: WordleSolver) -> None:
-    """Test candidate filtering reduction and undo history recovery."""
     initial_count = solver.words_left
     assert initial_count > 10000
 
@@ -85,14 +80,12 @@ def test_filtering_and_undo(solver: WordleSolver) -> None:
 
 
 def test_best_guess_recommendation(solver: WordleSolver) -> None:
-    """Test that optimal recommendations are informative 5-letter words."""
     best = solver.get_best_guess()
     assert len(best) == 5
     assert solver.is_valid_word(best)
 
 
 def test_legacy_interface_compatibility() -> None:
-    """Verify backwards-compatibility wrappers work identically."""
     getDictionary()
     count_start = wordsLeft()
     assert count_start > 10000

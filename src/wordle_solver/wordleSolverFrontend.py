@@ -14,7 +14,7 @@ from typing import Final
 
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
-from wordleSolverBackend import (
+from wordle_solver.wordleSolverBackend import (
     MAX_RETRIES,
     WORD_LENGTH,
     TileFeedback,
@@ -97,7 +97,7 @@ class WordleSolverApp:
     ----------
     root : tk.Tk
         The Tkinter root window instance.
-    dict_path : str
+    dict_path : str, default="CSW19.txt"
         Path to the 5-letter dictionary file.
 
     Attributes
@@ -193,9 +193,9 @@ class WordleSolverApp:
             Hex background fill color.
         border_color : str
             Hex border outline color.
-        size : int
+        size : int, default=56
             Target pixel width and height.
-        is_hover : bool
+        is_hover : bool, default=False
             Whether this tile is currently hovered by the mouse pointer.
 
         Returns
@@ -332,7 +332,7 @@ class WordleSolverApp:
                     bd=0,
                     cursor="",
                 )
-                tile.image = initial_img  # type: ignore[attr-defined]
+                setattr(tile, "image", initial_img)
                 tile.pack(side=tk.LEFT, padx=3)
 
                 tile.bind(
@@ -568,7 +568,9 @@ class WordleSolverApp:
         scrollbar.config(command=self.candidates_listbox.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.candidates_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.candidates_listbox.bind("<Double-Button-1>", self._on_candidate_double_click)
+        self.candidates_listbox.bind(
+            "<Double-Button-1>", self._on_candidate_double_click
+        )
 
         # Action Buttons Area
         btn_frame = tk.Frame(parent, bg=BG_MAIN)
@@ -707,7 +709,9 @@ class WordleSolverApp:
             tile.config(cursor="hand2")
             self.hover_tile = (row, col)
             self._update_tile_widget(row, col, is_hover=True)
-            self._set_status("Click this letter to cycle color: Gray -> Yellow -> Green", "info")
+            self._set_status(
+                "Click this letter to cycle color: Gray -> Yellow -> Green", "info"
+            )
         else:
             tile.config(cursor="")
 
@@ -757,7 +761,7 @@ class WordleSolverApp:
             Row index of tile.
         col : int
             Column index of tile.
-        is_hover : bool
+        is_hover : bool, default=False
             Whether this tile is currently hovered by mouse pointer.
         """
         tile = self.tile_labels[row][col]
@@ -770,10 +774,12 @@ class WordleSolverApp:
             )
         else:
             border = BORDER_HOVER if is_hover else color
-            photo = self._create_tile_image(char, color, border, size=54, is_hover=is_hover)
+            photo = self._create_tile_image(
+                char, color, border, size=54, is_hover=is_hover
+            )
 
         tile.config(image=photo)
-        tile.image = photo  # type: ignore[attr-defined]
+        setattr(tile, "image", photo)
 
     def _use_suggestion(self) -> None:
         """Auto-populate the current active row with the recommended suggestion."""
@@ -802,7 +808,13 @@ class WordleSolverApp:
         )
 
     def _on_candidate_double_click(self, event: tk.Event) -> None:
-        """Insert double-clicked word from candidate list into current row."""
+        """Insert double-clicked word from candidate list into current row.
+
+        Parameters
+        ----------
+        event : tk.Event
+            Tkinter mouse event details.
+        """
         selection = self.candidates_listbox.curselection()
         if not selection or self.current_row >= MAX_RETRIES:
             return
@@ -818,7 +830,9 @@ class WordleSolverApp:
     def submit_attempt(self) -> None:
         """Validate and evaluate the current attempt row against the solver engine."""
         if self.current_row >= MAX_RETRIES:
-            self._set_status("Game finished. Click Reset to start a new puzzle.", "warning")
+            self._set_status(
+                "Game finished. Click Reset to start a new puzzle.", "warning"
+            )
             return
 
         if self.current_col < WORD_LENGTH:
@@ -851,7 +865,9 @@ class WordleSolverApp:
 
         # Clear hover status
         if self.hover_tile and self.hover_tile[0] == self.current_row:
-            self._update_tile_widget(self.current_row, self.hover_tile[1], is_hover=False)
+            self._update_tile_widget(
+                self.current_row, self.hover_tile[1], is_hover=False
+            )
             self.hover_tile = None
 
         if all_green or (remaining == 1 and self.solver.candidates[0] == guess):
@@ -979,7 +995,9 @@ class WordleSolverApp:
 
         if rem_count < initial_count and initial_count > 0:
             filtered_pct = ((initial_count - rem_count) / initial_count) * 100
-            self.filter_ratio_label.config(text=f"Filtered {filtered_pct:.1f}% of search space")
+            self.filter_ratio_label.config(
+                text=f"Filtered {filtered_pct:.1f}% of search space"
+            )
         else:
             self.filter_ratio_label.config(text="Master dictionary loaded")
 
@@ -1004,7 +1022,7 @@ class WordleSolverApp:
         ----------
         message : str
             Message text to display.
-        level : str
+        level : str, default="info"
             Severity level ('info', 'success', 'warning', 'error').
         """
         color_map = {

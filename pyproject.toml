@@ -1,9 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "wordle-solver"
 version = "1.0.0"
 description = "High-performance Wordle Solver and interactive desktop assistant with information-theoretic heuristics."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13,<3.14"
 authors = [{ name = "Carlos Valente", email = "cfmvcarlos@gmail.com" }]
 license = { text = "MIT" }
 keywords = ["wordle", "wordle-solver", "python", "tkinter", "algorithm", "heuristic", "desktop-app"]
@@ -11,9 +15,6 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Games/Entertainment :: Puzzle Games",
 ]
@@ -28,40 +29,53 @@ Issues = "https://github.com/CFMVCarlos/wordle-solver/issues"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.8.0",
-    "pydoclint>=0.6.0",
     "basedpyright>=1.28.0",
+    "pydoclint>=0.6.0",
     "pytest>=8.0.0",
+    "ruff>=0.9.0",
+    "ty>=0.0.86",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/wordle_solver"]
+
 [tool.ruff]
-line-length = 100
-target-version = "py310"
+line-length = 88
+preview = true
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B"]
-ignore = ["E501"]
+select = ["ALL"]
+ignore = [
+    "CPY",
+    "FIX",
+    "TD",
+    "missing-trailing-comma",
+    "magic-value-comparison",
+    "boolean-type-hint-positional-argument",
+    "boolean-default-value-positional-argument",
+    "boolean-positional-value-in-call",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["assert", "private-member-access", "ANN", "D", "line-too-long", "import-outside-top-level", "runtime-cast-value", "magic-value-comparison"]
+"src/wordle_solver/wordleSolverFrontend.py" = ["invalid-module-name", "line-too-long", "invalid-function-name", "invalid-argument-name", "non-lowercase-variable-in-function", "mixed-case-variable-in-class-scope", "too-many-branches", "too-many-arguments", "too-many-locals", "too-many-statements", "too-many-positional-arguments", "complex-structure", "magic-value-comparison", "ANN", "D", "private-member-access", "os-path-exists", "os-path-join", "os-path-dirname", "builtin-open", "error-instead-of-exception", "unused-function-argument", "unused-method-argument", "unused-lambda-argument", "unused-loop-control-variable", "set-attr-with-constant", "suppressible-exception", "literal-membership"]
+"src/wordle_solver/wordleSolverBackend.py" = ["invalid-module-name", "line-too-long", "invalid-function-name", "invalid-argument-name", "non-lowercase-variable-in-function", "too-many-branches", "too-many-arguments", "too-many-locals", "too-many-statements", "too-many-positional-arguments", "complex-structure", "magic-value-comparison", "ANN", "D", "builtin-open", "global-statement", "import-outside-top-level", "global-variable-not-assigned", "too-many-statements-in-try-clause", "suppressible-exception", "try-consider-else", "print", "literal-membership"]
+
 [tool.pydoclint]
-style = "numpy"
-exclude = '\.venv|\.agents|__pycache__|build|dist'
-check-return-types = true
-check-arg-defaults = false
+exclude = ".git|.tox|.venv|build|dist|.uv-cache|.ruff_cache"
+skip-checking-short-docstrings = false
+check-style-mismatch = true
+check-arg-defaults = true
+show-filenames-in-every-violation-message = true
 check-class-attributes = false
 
-
-
 [tool.basedpyright]
+pythonVersion = "3.13"
 typeCheckingMode = "standard"
-exclude = [".venv", ".agents", "build", "dist", "__pycache__"]
-pythonVersion = "3.10"
 
 [tool.pytest.ini_options]
-minversion = "8.0"
-addopts = "-ra -q"
 testpaths = ["tests"]
-pythonpath = ["."]
-
+pythonpath = ["src"]

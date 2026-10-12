@@ -10,7 +10,7 @@ from __future__ import annotations
 import string
 from collections import Counter
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
@@ -35,7 +35,7 @@ COLOR_CODES: Final[dict[str, str]] = {
 }
 
 
-class TileFeedback(str, Enum):
+class TileFeedback(StrEnum):
     """Enumeration representing the three Wordle evaluation feedback states."""
 
     CORRECT = "G"
@@ -71,7 +71,7 @@ class WordleSolver:
 
     Parameters
     ----------
-    dict_path : str
+    dict_path : str, default=DICT_NAME
         Path to the text dictionary file containing words.
 
     Attributes
@@ -98,7 +98,7 @@ class WordleSolver:
 
         Parameters
         ----------
-        filepath : str | None
+        filepath : str | None, default=None
             Optional custom file path to load from. If None, uses ``self.dict_path``.
 
         Returns
@@ -118,9 +118,10 @@ class WordleSolver:
             if local_fallback.exists():
                 target_path = local_fallback
             else:
-                raise FileNotFoundError(f"Dictionary file not found at: {target_path}")
+                msg = f"Dictionary file not found at: {target_path}"
+                raise FileNotFoundError(msg)
 
-        with open(target_path, "r", encoding="utf-8", errors="ignore") as file:
+        with open(target_path, encoding="utf-8", errors="ignore") as file:
             words = [
                 line.strip().lower()
                 for line in file
@@ -195,9 +196,8 @@ class WordleSolver:
             if fb == "G":
                 if word[i] != g_char:
                     return False
-            elif fb in ("Y", "B"):
-                if word[i] == g_char:
-                    return False
+            elif fb in ("Y", "B") and word[i] == g_char:
+                return False
 
         # 2. Letter frequency constraints for each unique letter in the guess
         unique_chars = set(guess)
@@ -210,9 +210,8 @@ class WordleSolver:
             if has_absent:
                 if word_count != min_count:
                     return False
-            else:
-                if word_count < min_count:
-                    return False
+            elif word_count < min_count:
+                return False
 
         return True
 
@@ -235,7 +234,9 @@ class WordleSolver:
         normalized_fb = [fb.upper() for fb in feedback]
 
         self.candidates = [
-            w for w in self.candidates if self.matches_feedback(w, clean_guess, normalized_fb)
+            w
+            for w in self.candidates
+            if self.matches_feedback(w, clean_guess, normalized_fb)
         ]
 
         self.history.append(
@@ -284,7 +285,7 @@ class WordleSolver:
 
         Parameters
         ----------
-        allow_duplicates : bool
+        allow_duplicates : bool, default=False
             Whether to consider words with duplicate characters when candidates > 10.
 
         Returns
@@ -303,7 +304,11 @@ class WordleSolver:
         best_word = self.candidates[0]
 
         for word in self.candidates:
-            if not allow_duplicates and len(set(word)) < len(word) and len(self.candidates) > 10:
+            if (
+                not allow_duplicates
+                and len(set(word)) < len(word)
+                and len(self.candidates) > 10
+            ):
                 continue
 
             score = sum(char_counts[c] for c in set(word))
@@ -318,7 +323,7 @@ class WordleSolver:
 
         Parameters
         ----------
-        limit : int
+        limit : int, default=50
             Maximum number of candidate words to return.
 
         Returns
@@ -484,14 +489,18 @@ def removeGray(char: str, index: int, softRemove: bool = False) -> None:
         Character to filter.
     index : int
         Index position of the character in the guess.
-    softRemove : bool
+    softRemove : bool, default=False
         Flag indicating if the character appeared elsewhere in the guess as green/yellow.
     """
     global dictionary
     if softRemove:
-        _global_solver.candidates = [w for w in _global_solver.candidates if w[index] != char]
+        _global_solver.candidates = [
+            w for w in _global_solver.candidates if w[index] != char
+        ]
     else:
-        _global_solver.candidates = [w for w in _global_solver.candidates if char not in w]
+        _global_solver.candidates = [
+            w for w in _global_solver.candidates if char not in w
+        ]
     dictionary[:] = _global_solver.candidates
 
 
@@ -523,7 +532,9 @@ def removeGreen(char: str, index: int) -> None:
         Index position of the character in the guess.
     """
     global dictionary
-    _global_solver.candidates = [w for w in _global_solver.candidates if w[index] == char]
+    _global_solver.candidates = [
+        w for w in _global_solver.candidates if w[index] == char
+    ]
     dictionary[:] = _global_solver.candidates
 
 
@@ -605,7 +616,7 @@ def validateAttempt(word: str = "") -> tuple[int, str]:
 
     Parameters
     ----------
-    word : str
+    word : str, default=""
         Attempt string to validate.
 
     Returns
@@ -615,7 +626,9 @@ def validateAttempt(word: str = "") -> tuple[int, str]:
     """
     letter_word = "".join(filter(str.isalpha, word)).lower()
     if len(letter_word) != WORD_LENGTH:
-        return ERROR, printToBashCommand("Red", f"\nWord must be {WORD_LENGTH} letters long")
+        return ERROR, printToBashCommand(
+            "Red", f"\nWord must be {WORD_LENGTH} letters long"
+        )
 
     if not isInDictionary(letter_word):
         return ERROR, printToBashCommand(
@@ -624,7 +637,9 @@ def validateAttempt(word: str = "") -> tuple[int, str]:
 
     for i in range(len(word) - 1):
         if word[i] in "?!" and not word[i + 1].isalpha():
-            return ERROR, printToBashCommand("Red", f'\nInvalid placement of "{word[i]}"')
+            return ERROR, printToBashCommand(
+                "Red", f'\nInvalid placement of "{word[i]}"'
+            )
 
     return SUCCESS, word
 
@@ -647,7 +662,7 @@ def selectWord(look_duplicate: bool = False) -> str:
 
     Parameters
     ----------
-    look_duplicate : bool
+    look_duplicate : bool, default=False
         Whether to allow words with duplicate letters.
 
     Returns
@@ -681,7 +696,7 @@ def processWordleAttempt(string_val: str = "") -> tuple[int, str]:
 
     Parameters
     ----------
-    string_val : str
+    string_val : str, default=""
         Attempt string to process.
 
     Returns
@@ -697,8 +712,9 @@ def processWordleAttempt(string_val: str = "") -> tuple[int, str]:
         evaluateAttempt(attempt)
 
         try:
-            with open("words.txt", "w", encoding="utf-8") as word_file:
-                word_file.write("\n".join(_global_solver.candidates))
+            Path("words.txt").write_text(
+                "\n".join(_global_solver.candidates), encoding="utf-8"
+            )
         except OSError:
             pass
 

@@ -17,6 +17,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Games/Entertainment :: Puzzle Games",
 ]
+dependencies = [
+    "pillow>=12.3.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/CFMVCarlos/wordle-solver"

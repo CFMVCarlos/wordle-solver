@@ -1,4 +1,4 @@
 # Wordle Solver runtime dependencies
-# Note: The application uses Python's standard library (tkinter, collections, pathlib, dataclasses).
+pillow>=10.0.0
 # Optional desktop hook dependency (legacy):
 pynput>=1.7.7

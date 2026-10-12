@@ -1,8 +1,9 @@
 """Wordle Solver Graphical User Interface (GUI).
 
-Provides a modern, responsive, and visually polished desktop interface featuring an
-authentic 6x5 Wordle grid, interactive color-cycling tiles, a dynamic virtual keyboard,
-real-time candidate filtering, and information-gain recommendations.
+Provides a modern, high-definition desktop interface featuring antialiased letter
+tiles rendered via FreeType/Pillow, an authentic 6x5 Wordle grid with interactive
+color-cycling tiles, a dynamic virtual keyboard, real-time candidate filtering,
+and information-gain recommendations.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from typing import Final
+
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from wordleSolverBackend import (
     MAX_RETRIES,
@@ -27,6 +30,7 @@ BG_CARD: Final[str] = "#18181b"  # Elevated card surface
 BG_ELEVATED: Final[str] = "#27272a"  # Subtle raised container
 BORDER_DEFAULT: Final[str] = "#3a3a3c"  # Inactive tile and divider border
 BORDER_ACTIVE: Final[str] = "#818384"  # Active typing border
+BORDER_HOVER: Final[str] = "#ffffff"  # Hover border highlight for interactive tiles
 
 # Tile & Key feedback states
 COLOR_ABSENT: Final[str] = "#3a3a3c"  # Gray / Absent
@@ -56,8 +60,30 @@ CYCLE_FEEDBACK: Final[dict[str, str]] = {
 KEYBOARD_ROWS: Final[list[list[str]]] = [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
     ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-    ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "⌫"],
+    ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "DEL"],
 ]
+
+# TrueType font candidates for crisp antialiased rendering
+TTF_CANDIDATES: Final[list[str]] = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    "/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf",
+]
+
+
+def resolve_truetype_font() -> str | None:
+    """Locate the best available bold sans-serif TrueType font on the system.
+
+    Returns
+    -------
+    str | None
+        Absolute path to the TrueType font file, or None if unavailable.
+    """
+    for candidate in TTF_CANDIDATES:
+        if Path(candidate).is_file():
+            return candidate
+    return None
 
 
 class WordleSolverApp:
@@ -104,6 +130,10 @@ class WordleSolverApp:
         # Set taskbar / window icon if present
         self._setup_window_icon()
 
+        # Locate TrueType font for high-DPI antialiased tile drawing
+        self.font_path = resolve_truetype_font()
+        self._tile_cache: dict[tuple[str, str, str, bool], ImageTk.PhotoImage] = {}
+
         # Initialize solver engine
         self.solver = WordleSolver(dict_path)
 
@@ -118,6 +148,7 @@ class WordleSolverApp:
         ]
         self.tile_labels: list[list[tk.Label]] = []
         self.key_buttons: dict[str, tk.Button] = {}
+        self.hover_tile: tuple[int, int] | None = None
 
         # Construct UI hierarchy
         self._build_ui()
@@ -128,7 +159,7 @@ class WordleSolverApp:
         # Initial UI refresh
         self._refresh_intelligence_panel()
         self._set_status(
-            "Type letters on your keyboard, click tiles to toggle colors, then press Submit.",
+            "Type letters on keyboard, click tiles to toggle colors, then press Submit.",
             "info",
         )
 
@@ -141,6 +172,83 @@ class WordleSolverApp:
             except tk.TclError:
                 pass  # Ignore on X11 platforms without native ICO support
 
+    def _create_tile_image(
+        self,
+        letter: str,
+        bg_color: str,
+        border_color: str,
+        size: int = 56,
+        is_hover: bool = False,
+    ) -> ImageTk.PhotoImage:
+        """Render an antialiased, rounded letter tile using Pillow.
+
+        Uses 2x supersampling and Lanczos downsampling to eliminate pixelation
+        and produce crisp vector-like edges on high-resolution displays.
+
+        Parameters
+        ----------
+        letter : str
+            Single uppercase letter or empty string.
+        bg_color : str
+            Hex background fill color.
+        border_color : str
+            Hex border outline color.
+        size : int
+            Target pixel width and height.
+        is_hover : bool
+            Whether this tile is currently hovered by the mouse pointer.
+
+        Returns
+        -------
+        ImageTk.PhotoImage
+            Cached Tkinter-compatible image object.
+        """
+        cache_key = (letter, bg_color, border_color, is_hover)
+        if cache_key in self._tile_cache:
+            return self._tile_cache[cache_key]
+
+        scale = 2
+        w = size * scale
+        h = size * scale
+        radius = 6 * scale
+        border_width = (3 if is_hover else 2) * scale
+
+        img = Image.new("RGBA", (w, h), (18, 18, 19, 255))
+        draw = ImageDraw.Draw(img)
+
+        # Draw rounded tile rectangle
+        inset = border_width // 2
+        draw.rounded_rectangle(
+            [(inset, inset), (w - inset - 1, h - inset - 1)],
+            radius=radius,
+            fill=bg_color,
+            outline=BORDER_HOVER if is_hover else border_color,
+            width=border_width,
+        )
+
+        # Draw letter with TrueType font
+        if letter:
+            try:
+                if self.font_path:
+                    font = ImageFont.truetype(self.font_path, 28 * scale)
+                else:
+                    font = ImageFont.load_default()
+            except OSError:
+                font = ImageFont.load_default()
+
+            bbox = draw.textbbox((0, 0), letter, font=font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            x = (w - tw) / 2 - bbox[0]
+            y = (h - th) / 2 - bbox[1]
+            draw.text((x, y), letter, font=font, fill=(255, 255, 255, 255))
+
+        # Downsample with Lanczos for razor-sharp antialiased rendering
+        resampled = img.resize((size, size), Image.Resampling.LANCZOS)
+        photo = ImageTk.PhotoImage(resampled)
+        self._tile_cache[cache_key] = photo
+        return photo
+
     def _build_ui(self) -> None:
         """Construct the primary UI layout frames, grid, sidebar, and controls."""
         # Top Header Bar
@@ -150,7 +258,7 @@ class WordleSolverApp:
         title_label = tk.Label(
             header_frame,
             text="WORDLE SOLVER",
-            font=("Helvetica", 20, "bold"),
+            font=("Helvetica", 18, "bold"),
             fg=TEXT_WHITE,
             bg=BG_MAIN,
         )
@@ -158,12 +266,12 @@ class WordleSolverApp:
 
         subtitle_label = tk.Label(
             header_frame,
-            text="  •  Interactive Assistant & Heuristic Engine",
+            text="   |   Interactive Assistant & Heuristic Engine",
             font=("Helvetica", 11),
             fg=TEXT_MUTED,
             bg=BG_MAIN,
         )
-        subtitle_label.pack(side=tk.LEFT, pady=(4, 0))
+        subtitle_label.pack(side=tk.LEFT, pady=(2, 0))
 
         # Status notification banner
         self.status_banner = tk.Label(
@@ -205,47 +313,105 @@ class WordleSolverApp:
             The parent container frame for the grid.
         """
         grid_frame = tk.Frame(parent, bg=BG_MAIN)
-        grid_frame.pack(pady=(0, 10))
+        grid_frame.pack(pady=(0, 8))
 
         self.tile_labels = []
         for r in range(MAX_RETRIES):
             row_labels: list[tk.Label] = []
             row_frame = tk.Frame(grid_frame, bg=BG_MAIN)
-            row_frame.pack(pady=3)
+            row_frame.pack(pady=2)
 
             for c in range(WORD_LENGTH):
+                initial_img = self._create_tile_image(
+                    "", COLOR_EMPTY, BORDER_DEFAULT, size=54, is_hover=False
+                )
                 tile = tk.Label(
                     row_frame,
-                    text="",
-                    font=("Helvetica", 20, "bold"),
-                    width=3,
-                    height=1,
-                    fg=TEXT_WHITE,
-                    bg=COLOR_EMPTY,
-                    relief=tk.SOLID,
-                    bd=2,
-                    highlightthickness=0,
-                    cursor="hand2",
+                    image=initial_img,
+                    bg=BG_MAIN,
+                    bd=0,
+                    cursor="",
                 )
+                tile.image = initial_img  # type: ignore[attr-defined]
                 tile.pack(side=tk.LEFT, padx=3)
-                tile.bind("<Button-1>", lambda event, row=r, col=c: self._on_tile_clicked(row, col))
+
+                tile.bind(
+                    "<Button-1>",
+                    lambda event, row=r, col=c: self._on_tile_clicked(row, col),
+                )
+                tile.bind(
+                    "<Enter>",
+                    lambda event, row=r, col=c: self._on_tile_enter(row, col),
+                )
+                tile.bind(
+                    "<Leave>",
+                    lambda event, row=r, col=c: self._on_tile_leave(row, col),
+                )
                 row_labels.append(tile)
 
             self.tile_labels.append(row_labels)
 
-        # Tile legend hint
+        # Tile legend with visual badge pills
         legend_frame = tk.Frame(parent, bg=BG_MAIN)
-        legend_frame.pack(pady=(2, 10))
+        legend_frame.pack(pady=(4, 10))
 
-        legend_hint = tk.Label(
+        lbl_intro = tk.Label(
             legend_frame,
-            text="Click letters on active attempt to cycle colors:  "
-            "⬛ Absent  ➜  🟨 Present  ➜  🟩 Correct",
+            text="Click active letters to cycle: ",
             font=("Helvetica", 9),
             fg=TEXT_MUTED,
             bg=BG_MAIN,
         )
-        legend_hint.pack()
+        lbl_intro.pack(side=tk.LEFT)
+
+        pill_gray = tk.Label(
+            legend_frame,
+            text=" Absent ",
+            font=("Helvetica", 8, "bold"),
+            fg=TEXT_WHITE,
+            bg=COLOR_ABSENT,
+            padx=4,
+            pady=1,
+        )
+        pill_gray.pack(side=tk.LEFT, padx=2)
+
+        tk.Label(
+            legend_frame,
+            text="->",
+            font=("Helvetica", 9),
+            fg=TEXT_MUTED,
+            bg=BG_MAIN,
+        ).pack(side=tk.LEFT, padx=2)
+
+        pill_yellow = tk.Label(
+            legend_frame,
+            text=" Present ",
+            font=("Helvetica", 8, "bold"),
+            fg=TEXT_WHITE,
+            bg=COLOR_PRESENT,
+            padx=4,
+            pady=1,
+        )
+        pill_yellow.pack(side=tk.LEFT, padx=2)
+
+        tk.Label(
+            legend_frame,
+            text="->",
+            font=("Helvetica", 9),
+            fg=TEXT_MUTED,
+            bg=BG_MAIN,
+        ).pack(side=tk.LEFT, padx=2)
+
+        pill_green = tk.Label(
+            legend_frame,
+            text=" Correct ",
+            font=("Helvetica", 8, "bold"),
+            fg=TEXT_WHITE,
+            bg=COLOR_CORRECT,
+            padx=4,
+            pady=1,
+        )
+        pill_green.pack(side=tk.LEFT, padx=2)
 
     def _build_keyboard(self, parent: tk.Frame) -> None:
         """Construct the on-screen virtual keyboard with dynamic feedback colors.
@@ -258,12 +424,12 @@ class WordleSolverApp:
         kbd_frame = tk.Frame(parent, bg=BG_MAIN)
         kbd_frame.pack(fill=tk.X, pady=(4, 0))
 
-        for _row_idx, row_keys in enumerate(KEYBOARD_ROWS):
+        for row_keys in KEYBOARD_ROWS:
             row_frame = tk.Frame(kbd_frame, bg=BG_MAIN)
             row_frame.pack(pady=2)
 
             for key in row_keys:
-                width = 5 if key in ("ENTER", "⌫") else 3
+                width = 5 if key in ("ENTER", "DEL") else 3
                 btn = tk.Button(
                     row_frame,
                     text=key,
@@ -356,7 +522,7 @@ class WordleSolverApp:
 
         use_btn = tk.Button(
             rec_card,
-            text="⚡ Use Suggestion",
+            text="Use Suggestion",
             font=("Helvetica", 9, "bold"),
             fg=TEXT_WHITE,
             bg=COLOR_SECONDARY_BTN,
@@ -428,7 +594,7 @@ class WordleSolverApp:
 
         undo_btn = tk.Button(
             action_row,
-            text="↶ Undo (Ctrl+Z)",
+            text="Undo (Ctrl+Z)",
             font=("Helvetica", 9, "bold"),
             fg=TEXT_WHITE,
             bg=COLOR_SECONDARY_BTN,
@@ -443,7 +609,7 @@ class WordleSolverApp:
 
         reset_btn = tk.Button(
             action_row,
-            text="↺ Reset",
+            text="Reset (Ctrl+R)",
             font=("Helvetica", 9, "bold"),
             fg=TEXT_WHITE,
             bg=COLOR_DANGER_BTN,
@@ -485,11 +651,11 @@ class WordleSolverApp:
         Parameters
         ----------
         key : str
-            The key string value clicked (e.g. 'A', 'ENTER', '⌫').
+            The key string value clicked (e.g. 'A', 'ENTER', 'DEL').
         """
         if key == "ENTER":
             self.submit_attempt()
-        elif key == "⌫":
+        elif key == "DEL":
             self._handle_backspace()
         elif key.isalpha() and len(key) == 1:
             self._handle_char_input(key)
@@ -525,6 +691,42 @@ class WordleSolverApp:
             self.grid_states[self.current_row][self.current_col] = COLOR_EMPTY
             self._update_tile_widget(self.current_row, self.current_col)
 
+    def _on_tile_enter(self, row: int, col: int) -> None:
+        """Update cursor and highlight border when hovering over active tiles.
+
+        Parameters
+        ----------
+        row : int
+            Row index of tile hovered.
+        col : int
+            Column index of tile hovered.
+        """
+        tile = self.tile_labels[row][col]
+        # Only active row tiles with typed letters are clickable
+        if row == self.current_row and self.grid_letters[row][col]:
+            tile.config(cursor="hand2")
+            self.hover_tile = (row, col)
+            self._update_tile_widget(row, col, is_hover=True)
+            self._set_status("Click this letter to cycle color: Gray -> Yellow -> Green", "info")
+        else:
+            tile.config(cursor="")
+
+    def _on_tile_leave(self, row: int, col: int) -> None:
+        """Restore normal tile appearance when mouse leaves.
+
+        Parameters
+        ----------
+        row : int
+            Row index of tile left.
+        col : int
+            Column index of tile left.
+        """
+        tile = self.tile_labels[row][col]
+        tile.config(cursor="")
+        if self.hover_tile == (row, col):
+            self.hover_tile = None
+        self._update_tile_widget(row, col, is_hover=False)
+
     def _on_tile_clicked(self, row: int, col: int) -> None:
         """Cycle tile color when clicked by user on the active row.
 
@@ -544,9 +746,9 @@ class WordleSolverApp:
         current_color = self.grid_states[row][col]
         next_color = CYCLE_COLORS.get(current_color, COLOR_ABSENT)
         self.grid_states[row][col] = next_color
-        self._update_tile_widget(row, col)
+        self._update_tile_widget(row, col, is_hover=True)
 
-    def _update_tile_widget(self, row: int, col: int) -> None:
+    def _update_tile_widget(self, row: int, col: int, is_hover: bool = False) -> None:
         """Synchronize the graphical Label tile with its internal letter and state.
 
         Parameters
@@ -555,20 +757,23 @@ class WordleSolverApp:
             Row index of tile.
         col : int
             Column index of tile.
+        is_hover : bool
+            Whether this tile is currently hovered by mouse pointer.
         """
         tile = self.tile_labels[row][col]
         char = self.grid_letters[row][col]
         color = self.grid_states[row][col]
 
-        tile.config(text=char)
-        if char:
-            tile.config(bg=color, fg=TEXT_WHITE)
-            if color == COLOR_EMPTY:
-                tile.config(bg=BG_MAIN, relief=tk.SOLID, bd=2)
-            else:
-                tile.config(relief=tk.FLAT, bd=0)
+        if not char:
+            photo = self._create_tile_image(
+                "", COLOR_EMPTY, BORDER_DEFAULT, size=54, is_hover=False
+            )
         else:
-            tile.config(bg=COLOR_EMPTY, relief=tk.SOLID, bd=2)
+            border = BORDER_HOVER if is_hover else color
+            photo = self._create_tile_image(char, color, border, size=54, is_hover=is_hover)
+
+        tile.config(image=photo)
+        tile.image = photo  # type: ignore[attr-defined]
 
     def _use_suggestion(self) -> None:
         """Auto-populate the current active row with the recommended suggestion."""
@@ -592,7 +797,7 @@ class WordleSolverApp:
 
         self.current_col = WORD_LENGTH
         self._set_status(
-            f"Populated '{suggested.upper()}'. Click tiles to adjust colors, then press Submit.",
+            f"Populated '{suggested.upper()}'. Click letters to adjust colors, then press Submit.",
             "info",
         )
 
@@ -618,7 +823,8 @@ class WordleSolverApp:
 
         if self.current_col < WORD_LENGTH:
             self._set_status(
-                f"Please enter all {WORD_LENGTH} letters before submitting.", "warning"
+                f"Please enter all {WORD_LENGTH} letters before submitting.",
+                "warning",
             )
             return
 
@@ -643,9 +849,14 @@ class WordleSolverApp:
         # Update keyboard key colors based on revealed feedback
         self._update_keyboard_colors(guess, feedback)
 
+        # Clear hover status
+        if self.hover_tile and self.hover_tile[0] == self.current_row:
+            self._update_tile_widget(self.current_row, self.hover_tile[1], is_hover=False)
+            self.hover_tile = None
+
         if all_green or (remaining == 1 and self.solver.candidates[0] == guess):
             self._set_status(
-                f"🎉 Solved! The target word is '{guess.upper()}' in {self.current_row + 1} attempts!",
+                f"[SOLVED] Target word '{guess.upper()}' identified in {self.current_row + 1} attempts!",
                 "success",
             )
             self._refresh_intelligence_panel()
@@ -654,7 +865,7 @@ class WordleSolverApp:
 
         if remaining == 0:
             self._set_status(
-                "⚠️ No dictionary words match this feedback pattern. Check for tile color mistakes.",
+                "[NOTICE] No dictionary words match this feedback pattern. Check tile colors.",
                 "error",
             )
             return
@@ -690,6 +901,7 @@ class WordleSolverApp:
 
         self.current_row = target_row
         self.current_col = 0
+        self.hover_tile = None
 
         # Recalculate keyboard colors across remaining history
         self._rebuild_keyboard_colors()
@@ -704,6 +916,7 @@ class WordleSolverApp:
         self.solver.reset()
         self.current_row = 0
         self.current_col = 0
+        self.hover_tile = None
 
         for r in range(MAX_RETRIES):
             for c in range(WORD_LENGTH):
@@ -716,7 +929,8 @@ class WordleSolverApp:
 
         self._refresh_intelligence_panel()
         self._set_status(
-            "Board reset. Type your initial guess (e.g. AEROS, SOARE, or CRANE).", "info"
+            "Board reset. Type your initial guess (e.g. AEROS, SOARE, or CRANE).",
+            "info",
         )
 
     def _update_keyboard_colors(self, guess: str, feedback: list[str]) -> None:
